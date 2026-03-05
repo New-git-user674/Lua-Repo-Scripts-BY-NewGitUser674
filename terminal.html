@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lua Web Terminal</title>
+
+  <!-- Basic styling -->
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #020617;
+      --accent: #22c55e;
+      --accent-soft: #16a34a;
+      --text: #e5e7eb;
+      --muted: #6b7280;
+      --error: #f97373;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+    }
+
+    .terminal-wrapper {
+      width: 90vw;
+      max-width: 960px;
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 14px;
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(148, 163, 184, 0.15);
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      backdrop-filter: blur(18px);
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: linear-gradient(to right, #020617, #0b1120);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 6px;
+    }
+
+    .traffic-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.8);
+    }
+
+    .traffic-dot.red {
+      background: #f97373;
+    }
+
+    .traffic-dot.yellow {
+      background: #facc15;
+    }
+
+    .traffic-dot.green {
+      background: #22c55e;
+    }
+
+    .terminal-title {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+
+    .terminal-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      color: #bbf7d0;
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.35), transparent 55%);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .terminal-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+    }
+
+    .terminal-main {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.4fr);
+      gap: 0;
+      min-height: 420px;
+    }
+
+    .terminal-left,
+    .terminal-right {
+      padding: 14px 16px 16px;
+    }
+
+    .terminal-left {
+      border-right: 1px solid rgba(55, 65, 81, 0.7);
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 60%);
+    }
+
+    .terminal-right {
+      background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 60%);
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .section-title span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-title span::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: linear-gradient(to bottom right, #22c55e, #4ade80);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+    }
+
+    .section-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .editor {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 10px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      resize: none;
+      width: 100%;
+      height: 260px;
+      outline: none;
+      line-height: 1.5;
+      caret-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    .editor:focus {
+      border-color: rgba(34, 197, 94, 0.8);
+      box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.5),
+        0 0 0 8px rgba(34, 197, 94, 0.12);
+    }
+
+    .output {
+      background: #020617;
+      border-radius: 10px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      height: 260px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      position: relative;
+    }
+
+    .output::before {
+      content: "stdout";
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: rgba(148, 163, 184, 0.7);
+    }
+
+    .output-line {
+      display: block;
+    }
+
+    .output-line.prompt {
+      color: #a5b4fc;
+    }
+
+    .output-line.result {
+      color: #e5e7eb;
+    }
+
+    .output-line.error {
+      color: var(--error);
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border-radius: 999px;
+      border: 1px solid rgba(34, 197, 94, 0.8);
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.4), rgba(22, 163, 74, 0.9));
+      color: #ecfdf5;
+      font-size: 13px;
+      padding: 7px 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border-bottom-width: 2px;
+      border-bottom-color: rgba(21, 128, 61, 0.9);
+      box-shadow:
+        0 12px 25px rgba(22, 163, 74, 0.45),
+        0 0 0 1px rgba(21, 128, 61, 0.7);
+      transition:
+        transform 0.08s ease-out,
+        box-shadow 0.08s ease-out,
+        background 0.12s ease-out;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 16px 35px rgba(22, 163, 74, 0.6),
+        0 0 0 1px rgba(21, 128, 61, 0.9);
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.55), rgba(22, 163, 74, 1));
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 6px 15px rgba(22, 163, 74, 0.5),
+        0 0 0 1px rgba(21, 128, 61, 0.9);
+    }
+
+    .btn-secondary {
+      border-color: rgba(148, 163, 184, 0.7);
+      background: radial-gradient(circle at top left, rgba(30, 64, 175, 0.5), rgba(15, 23, 42, 0.95));
+      color: #e5e7eb;
+      border-bottom-color: rgba(30, 64, 175, 0.9);
+      box-shadow:
+        0 10px 22px rgba(30, 64, 175, 0.55),
+        0 0 0 1px rgba(30, 64, 175, 0.8);
+    }
+
+    .btn-secondary:hover {
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.7), rgba(15, 23, 42, 1));
+      box-shadow:
+        0 14px 30px rgba(37, 99, 235, 0.7),
+        0 0 0 1px rgba(37, 99, 235, 0.9);
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hint-kbd {
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+    }
+
+    .status {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .status span {
+      color: #bbf7d0;
+    }
+
+    @media (max-width: 800px) {
+      .terminal-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .terminal-left {
+        border-right: none;
+        border-bottom: 1px solid rgba(55, 65, 81, 0.7);
+      }
+    }
+  </style>
+
+  <!-- Fengari (Lua VM in JS) -->
+  <script src="https://unpkg.com/fengari-web/dist/fengari-web.js"></script>
+</head>
+<body>
+  <div class="terminal-wrapper">
+    <div class="terminal-header">
+      <div class="traffic-lights">
+        <div class="traffic-dot red"></div>
+        <div class="traffic-dot yellow"></div>
+        <div class="traffic-dot green"></div>
+      </div>
+      <div class="terminal-title">lua@browser • /usr/local/bin/lua</div>
+      <div class="terminal-badge">
+        <span class="terminal-badge-dot"></span>
+        Lua REPL
+      </div>
+    </div>
+
+    <div class="terminal-main">
+      <!-- Left: Lua editor -->
+      <div class="terminal-left">
+        <div class="section-title">
+          <span>Lua source</span>
+          <div class="section-subtitle">Type Lua and run it in the browser</div>
+        </div>
+
+        <textarea id="lua-input" class="editor" spellcheck="false">
+-- Welcome to the Lua web terminal
+-- Try some examples:
+
+print("Hello from Lua!")
+
+-- Simple math:
+print(2 + 3 * 4)
+
+-- A function:
+function greet(name)
+  return "Hi, " .. name .. "!"
+end
+
+print(greet("Copilot"))
+        </textarea>
+
+        <div class="controls">
+          <button id="run-btn" class="btn">
+            ▶ Run Lua
+          </button>
+          <button id="clear-btn" class="btn btn-secondary">
+            ⌫ Clear output
+          </button>
+          <div class="hint">
+            <span>Shortcut:</span>
+            <span class="hint-kbd">Ctrl</span> + <span class="hint-kbd">Enter</span>
+            <span>to run</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Output -->
+      <div class="terminal-right">
+        <div class="section-title">
+          <span>Terminal output</span>
+          <div class="section-subtitle">Lua <code>print</code> and errors appear here</div>
+        </div>
+
+        <div id="output" class="output"></div>
+
+        <div class="controls" style="margin-top: 8px;">
+          <div class="hint">
+            <span>Environment:</span>
+            <span class="hint-kbd">fengari-web</span>
+            <span class="hint-kbd">Lua 5.3</span>
+          </div>
+          <div class="status">
+            Status: <span id="status-text">ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS glue code -->
+  <script>
+    (function () {
+      const luaInput = document.getElementById("lua-input");
+      const outputEl = document.getElementById("output");
+      const runBtn = document.getElementById("run-btn");
+      const clearBtn = document.getElementById("clear-btn");
+      const statusText = document.getElementById("status-text");
+
+      // Fengari globals
+      const {
+        lua,
+        lauxlib,
+        lualib,
+        to_luastring
+      } = fengari;
+
+      function appendLine(text, type) {
+        const line = document.createElement("div");
+        line.className = "output-line " + (type || "result");
+        line.textContent = text;
+        outputEl.appendChild(line);
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+
+      function clearOutput() {
+        outputEl.innerHTML = "";
+      }
+
+      function setStatus(text, isError) {
+        statusText.textContent = text;
+        statusText.style.color = isError ? "#f97373" : "#bbf7d0";
+      }
+
+      function runLua(code) {
+        clearStatusError = false;
+        setStatus("running…", false);
+
+        // Create a new Lua state
+        const L = lauxlib.luaL_newstate();
+        lualib.luaL_openlibs(L);
+
+        // Override print to capture output
+        lua.lua_pushcfunction(L, function (L) {
+          const n = lua.lua_gettop(L);
+          let parts = [];
+          for (let i = 1; i <= n; i++) {
+            parts.push(lauxlib.luaL_tolstring(L, i));
+            lua.lua_pop(L, 1);
+          }
+          const line = parts.map(s => fengari.to_jsstring(s)).join("\t");
+          appendLine(line, "result");
+          return 0;
+        });
+        lua.lua_setglobal(L, to_luastring("print"));
+
+        // Load and run the code
+        const status = lauxlib.luaL_loadstring(L, to_luastring(code));
+
+        if (status === lua.LUA_OK) {
+          const callStatus = lua.lua_pcall(L, 0, lua.LUA_MULTRET, 0);
+          if (callStatus !== lua.LUA_OK) {
+            const msg = fengari.to_jsstring(lua.lua_tostring(L, -1));
+            appendLine("Error: " + msg, "error");
+            setStatus("error", true);
+          } else {
+            setStatus("done", false);
+          }
+        } else {
+          const msg = fengari.to_jsstring(lua.lua_tostring(L, -1));
+          appendLine("Compile error: " + msg, "error");
+          setStatus("error", true);
+        }
+      }
+
+      // Event handlers
+      runBtn.addEventListener("click", () => {
+        const code = luaInput.value;
+        appendLine("> lua chunk", "prompt");
+        runLua(code);
+      });
+
+      clearBtn.addEventListener("click", () => {
+        clearOutput();
+        setStatus("ready", false);
+      });
+
+      luaInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          runBtn.click();
+        }
+      });
+
+      // Initial message
+      appendLine("Lua web terminal ready. Type code on the left and press Run.", "result");
+    })();
+  </script>
+</body>
+</html>
